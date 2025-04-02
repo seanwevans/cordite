@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+
+""" fuse - jump start a react project """
+
+import argparse
+import datetime
+import json
+import os
+import logging
+import re
+from pathlib import Path
+import subprocess
+import sys
+
+import requests
+
+
+PROG = Path(__file__).stem
+VERSION = "1.2.0"
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+
+def parse_args(args):
+    """parse command line arguments"""
+
+    argp = argparse.ArgumentParser(
+        prog=PROG,
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        add_help=False,
+    )
+
+    argp.add_argument(
+        "project_name",
+        help="The name of the react project you want to jump start",
+    )
+
+    argp.add_argument(
+        "-t", "--tailwind", action="store_true", help="Install Tailwind CSS"
+    )
+
+    argp.add_argument(
+        "-l", "--lucide", action="store_true", help="Install Lucide React"
+    )
+
+    argp.add_argument(
+        "-d",
+        "--deploy",
+        action="store_true",
+        help="Configure GitHub Pages deployment",
+    )
+
+    argp.add_argument(
+        "--version",
+        action="version",
+        version=f"{PROG} v{VERSION}",
+    )
+
+    argp.add_argument(
+        "--help",
+        action="help",
+        help="show this help message and exit",
+    )
+
+    return argp.parse_args(args)
+
+
+def initialize_logs(
+    params=None, log_file=None, stream_level=logging.DEBUG, file_level=logging.DEBUG
+):
+    """initializes logs"""
+
+    for handler in logger.handlers:
+        logger.removeHandler(handler)
+
+    log_format = logging.Formatter(
+        "%(asctime)-23s %(module)s.%(funcName)s %(levelname)-8s %(message)s"
+    )
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(log_format)
+    stream_handler.setLevel(stream_level)
+    logger.addHandler(stream_handler)
+
+    if log_file:
+        file_handler = logging.FileHandler(log_file, encoding="UTF-8")
+        file_handler.setFormatter(log_format)
+        file_handler.setLevel(file_level)
+        logger.addHandler(file_handler)
+
+    logger.info("🍍 %s (v%s)", Path(__file__).resolve(), VERSION)
+
+    if params:
+        logger.debug("Parameters:")
+        for param, value in vars(params).items():
+            logger.debug("  %-16s%s", param, value)
+
+    logger.debug("Logs:")
+    for log_handle in logger.handlers:
+        logger.debug("  %s", log_handle)
+
+
+def run_command(command):
+    """Run a shell command and handle errors"""
+    logger.debug("🧨 %s", command)
+    try:
+        subprocess.run(command, shell=True, check=True)
+        return True
+    except Exception as exc:
+        logger.error(exc)
+        raise exc
+    return False
+
+
+def load_previous_ideas():
+    """Load record of previous ideas if it exists"""
+    ideas_file = Path.home() / ".fuse_ideas.json"
+    if ideas_file.exists():
+        try:
+            return json.loads(ideas_file.read_text(encoding="UTF-8"))
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse ideas file, starting fresh")
+    return []
+
+
+def save_idea(idea):
+    """Save idea to persistent storage"""
+    ideas_file = Path.home() / ".fuse_ideas.json"
+    previous_ideas = load_previous_ideas()
+    previous_ideas.append(idea)
+    ideas_file.write_text(json.dumps(previous_ideas, indent=2), encoding="UTF-8")
+
+
+def stand_up(project_name, install_tailwind=False, install_lucide=False):
+    """initialize npm project"""
+    npm_inited = run_command(
+        f'npm create vite@latest "{project_name}" -- --template react'
+    )
+    if not npm_inited:
+        raise RuntimeError("Failed to initialize project")
+
+    try:
+        os.chdir(project_name)
+    except Exception as exc:
+        logger.error(exc)
+        raise exc
+
+    deps_installed = run_command("npm install")
+    if not deps_installed:
+        raise RuntimeError("Failed to install dependencies")
+
+    if install_tailwind:
+        twcss_cmd = "npm install tailwindcss @tailwindcss/vite"
+        twcss_installed = run_command(twcss_cmd)
+        if not twcss_installed:
+            raise RuntimeError("Failed to install tailwind CSS")
+
+    if install_lucide:
+        lucide_cmd = "npm install lucide-react"
+        lucide_installed = run_command(lucide_cmd)
+        if not lucide_installed:
+            raise RuntimeError("Failed to install Lucide-React")
+
+
+def remove_cruft():
+    """remove the cruft"""
+    files_to_remove = [
+        "src/App.css",
+        "README.md",
+        "src/assets/react.svg",
+        "public/vite.svg",
+    ]
+    for file_to_remove in files_to_remove:
+        try:
+            os.remove(file_to_remove)
+        except Exception:
+            logger.warning("Failed to unlink %s", file_to_remove, exc_info=True)
+
+
+def create_gitignore():
+    """create a gitignore"""
+    gitignore_elems = [
+        "node_modules",
+        "*.log",
+        "dist",
+        ".vit",
+        "stats.html",
+        ".eslintcache",
+    ]
+    try:
+        Path(".gitignore").write_text("\n".join(gitignore_elems), encoding="UTF-8")
+    except Exception as exc:
+        logger.error(exc)
+        raise exc
+
+
+def create_vite_config(install_tailwind=False):
+    """create a vite configuration"""
+    vite_config_elems = [
+        "import { defineConfig } from 'vite'",
+        "import react from '@vitejs/plugin-react'",
+        "",
+        "export default defineConfig({",
+        "  plugins: [",
+        "    react(),",
+        "",
+        "  ]",
+        "})",
+    ]
+
+    if install_tailwind:
+        try:
+            Path("src/index.css").write_text(
+                '@import "tailwindcss";\n', encoding="UTF-8"
+            )
+        except Exception as exc:
+            logger.error(exc)
+            raise exc
+        vite_config_elems[2] = "import tailwindcss from '@tailwindcss/vite'"
+        vite_config_elems[6] = "    tailwindcss(),"
+
+    try:
+        Path("vite.config.js").write_text(
+            "\n".join(vite_config_elems), encoding="UTF-8"
+        )
+    except Exception as exc:
+        logger.error(exc)
+        raise exc
+
+
+def fix_main_jsx():
+    """fix src/main.jsx"""
+    main_jsx = Path("src/main.jsx")
+    try:
+        jsx = main_jsx.read_text(encoding="UTF-8")
+        jsx = "import React from 'react';\n" + jsx
+        main_jsx.write_text(jsx, encoding="UTF-8")
+    except Exception as exc:
+        logger.error(exc)
+        raise exc
+
+
+def fix_index_html(project_name):
+    """fix index.html"""
+    index_html = Path("index.html")
+    try:
+        html = index_html.read_text(encoding="UTF-8")
+        html = re.sub(
+            r"<title>Vite \+ React<\/title>", f"<title>{project_name}</title>", html
+        )
+        index_html.write_text(html, encoding="UTF-8")
+    except Exception as exc:
+        logger.error(exc)
+        raise exc
+
+
+def setup_github_pages(project_name):
+    """Configure project for GitHub Pages deployment"""
+
+    ghpages_installed = run_command("npm install gh-pages --save-dev")
+    if not ghpages_installed:
+        raise RuntimeError("Failed to install gh-pages")
+
+    pkg_file = Path("package.json")
+    if not pkg_file.exists():
+        logger.error("package.json not found")
+        return
+
+    try:
+        pkg_json = json.loads(pkg_file.read_text(encoding="UTF-8"))
+    except Exception as exc:
+        logger.error("Failed to parse package.json: %s", exc)
+        return
+
+    scripts = pkg_json.get("scripts", {})
+    scripts["predeploy"] = "npm run build"
+    scripts["deploy"] = "gh-pages -d dist"
+    pkg_json["scripts"] = scripts
+
+    pkg_file.write_text(json.dumps(pkg_json, indent=2), encoding="UTF-8")
+    logger.info("Updated package.json with predeploy and deploy scripts")
+
+    vite_config = Path("vite.config.js")
+    if vite_config.exists():
+        try:
+            config_text = vite_config.read_text(encoding="UTF-8")
+            config_text = re.sub(
+                r"(defineConfig\(\s*\{)",
+                r"\1\n  base: '/{}',".format(project_name),
+                config_text,
+                count=1,
+            )
+            vite_config.write_text(config_text, encoding="UTF-8")
+            logger.info("Updated vite.config.js with base property for GitHub Pages")
+        except Exception as exc:
+            logger.error("Failed to update vite.config.js: %s", exc)
+    else:
+        logger.warning(
+            "vite.config.js not found; cannot set base property for GitHub Pages"
+        )
+
+
+def create_project(
+    working_dir, project_name, install_tailwind=False, install_lucide=False
+):
+    """do the thang"""
+    os.chdir(working_dir)
+
+    stand_up(
+        project_name=project_name,
+        install_tailwind=install_tailwind,
+        install_lucide=install_lucide,
+    )
+    remove_cruft()
+    create_gitignore()
+    create_vite_config(install_tailwind=install_tailwind)
+    fix_main_jsx()
+    fix_index_html(project_name)
+
+
+def main(args):
+    """script entrypoint"""
+
+    params = parse_args(args)
+    initialize_logs(params)
+
+    orig_dir = os.getcwd()
+    create_project(
+        orig_dir,
+        params.project_name,
+        install_tailwind=params.tailwind,
+        install_lucide=params.lucide,
+    )
+    logger.info("💥 successfuly created %s", params.project_name)
+
+    if params.deploy:
+        setup_github_pages(params.project_name)
+        logger.info(
+            "🚀 GitHub Pages deployment configured. To deploy, run 'npm run deploy' after committing your changes."
+        )
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
