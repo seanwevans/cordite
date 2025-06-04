@@ -3,7 +3,6 @@
 """ fuse - jump start a react project """
 
 import argparse
-import datetime
 import json
 import os
 import logging
@@ -11,9 +10,6 @@ import re
 from pathlib import Path
 import subprocess
 import sys
-
-import requests
-
 
 PROG = Path(__file__).stem
 VERSION = "1.2.0"
