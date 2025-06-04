@@ -108,10 +108,14 @@ def run_command(command):
     try:
         subprocess.run(command, shell=True, check=True)
         return True
-    except Exception as exc:
-        logger.error(exc)
-        raise exc
-    return False
+    except subprocess.CalledProcessError as exc:
+        logger.error(
+            "Command '%s' failed with exit code %s", command, exc.returncode, exc_info=True
+        )
+        return False
+    except OSError as exc:
+        logger.error("Failed to execute command '%s': %s", command, exc, exc_info=True)
+        return False
 
 
 def load_previous_ideas():
@@ -143,9 +147,9 @@ def stand_up(project_name, install_tailwind=False, install_lucide=False):
 
     try:
         os.chdir(project_name)
-    except Exception as exc:
-        logger.error(exc)
-        raise exc
+    except OSError as exc:
+        logger.error("Failed to change directory to %s: %s", project_name, exc, exc_info=True)
+        raise
 
     deps_installed = run_command("npm install")
     if not deps_installed:
@@ -175,8 +179,10 @@ def remove_cruft():
     for file_to_remove in files_to_remove:
         try:
             os.remove(file_to_remove)
-        except Exception:
-            logger.warning("Failed to unlink %s", file_to_remove, exc_info=True)
+        except FileNotFoundError:
+            logger.debug("%s does not exist, skipping", file_to_remove)
+        except OSError as exc:
+            logger.warning("Failed to unlink %s: %s", file_to_remove, exc, exc_info=True)
 
 
 def create_gitignore():
@@ -191,9 +197,9 @@ def create_gitignore():
     ]
     try:
         Path(".gitignore").write_text("\n".join(gitignore_elems), encoding="UTF-8")
-    except Exception as exc:
-        logger.error(exc)
-        raise exc
+    except OSError as exc:
+        logger.error("Failed to write .gitignore: %s", exc, exc_info=True)
+        raise
 
 
 def create_vite_config(install_tailwind=False):
@@ -215,9 +221,9 @@ def create_vite_config(install_tailwind=False):
             Path("src/index.css").write_text(
                 '@import "tailwindcss";\n', encoding="UTF-8"
             )
-        except Exception as exc:
-            logger.error(exc)
-            raise exc
+        except OSError as exc:
+            logger.error("Failed to update src/index.css: %s", exc, exc_info=True)
+            raise
         vite_config_elems[2] = "import tailwindcss from '@tailwindcss/vite'"
         vite_config_elems[6] = "    tailwindcss(),"
 
@@ -225,9 +231,9 @@ def create_vite_config(install_tailwind=False):
         Path("vite.config.js").write_text(
             "\n".join(vite_config_elems), encoding="UTF-8"
         )
-    except Exception as exc:
-        logger.error(exc)
-        raise exc
+    except OSError as exc:
+        logger.error("Failed to write vite.config.js: %s", exc, exc_info=True)
+        raise
 
 
 def fix_main_jsx():
@@ -237,9 +243,9 @@ def fix_main_jsx():
         jsx = main_jsx.read_text(encoding="UTF-8")
         jsx = "import React from 'react';\n" + jsx
         main_jsx.write_text(jsx, encoding="UTF-8")
-    except Exception as exc:
-        logger.error(exc)
-        raise exc
+    except OSError as exc:
+        logger.error("Failed to patch src/main.jsx: %s", exc, exc_info=True)
+        raise
 
 
 def fix_index_html(project_name):
@@ -251,9 +257,9 @@ def fix_index_html(project_name):
             r"<title>Vite \+ React<\/title>", f"<title>{project_name}</title>", html
         )
         index_html.write_text(html, encoding="UTF-8")
-    except Exception as exc:
-        logger.error(exc)
-        raise exc
+    except OSError as exc:
+        logger.error("Failed to update index.html: %s", exc, exc_info=True)
+        raise
 
 
 def setup_github_pages(project_name):
@@ -270,8 +276,8 @@ def setup_github_pages(project_name):
 
     try:
         pkg_json = json.loads(pkg_file.read_text(encoding="UTF-8"))
-    except Exception as exc:
-        logger.error("Failed to parse package.json: %s", exc)
+    except json.JSONDecodeError as exc:
+        logger.error("Failed to parse package.json: %s", exc, exc_info=True)
         return
 
     scripts = pkg_json.get("scripts", {})
@@ -294,8 +300,8 @@ def setup_github_pages(project_name):
             )
             vite_config.write_text(config_text, encoding="UTF-8")
             logger.info("Updated vite.config.js with base property for GitHub Pages")
-        except Exception as exc:
-            logger.error("Failed to update vite.config.js: %s", exc)
+        except OSError as exc:
+            logger.error("Failed to update vite.config.js: %s", exc, exc_info=True)
     else:
         logger.warning(
             "vite.config.js not found; cannot set base property for GitHub Pages"
