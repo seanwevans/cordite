@@ -339,7 +339,7 @@ def main(args):
         install_tailwind=params.tailwind,
         install_lucide=params.lucide,
     )
-    logger.info("💥 successfuly created %s", params.project_name)
+    logger.info("💥 successfully created %s", params.project_name)
 
     if params.deploy:
         setup_github_pages(params.project_name)
