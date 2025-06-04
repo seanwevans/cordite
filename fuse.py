@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-""" fuse - jump start a react project """
+"""fuse - jump start a react project"""
 
 import argparse
 import json
@@ -64,7 +64,10 @@ def parse_args(args):
 
 
 def initialize_logs(
-    params=None, log_file=None, stream_level=logging.DEBUG, file_level=logging.DEBUG
+    params=None,
+    log_file=None,
+    stream_level=logging.DEBUG,
+    file_level=logging.DEBUG,
 ):
     """initializes logs"""
 
@@ -113,7 +116,6 @@ def run_command(command):
         logger.error("Failed to execute command '%s': %s", command, exc, exc_info=True)
         return False
 
-
 def stand_up(project_name, install_tailwind=False, install_lucide=False):
     """initialize npm project"""
     npm_inited = run_command(
@@ -161,7 +163,7 @@ def remove_cruft():
         except OSError as exc:
             logger.warning("Failed to unlink %s: %s", file_to_remove, exc, exc_info=True)
 
-
+            
 def create_gitignore():
     """create a gitignore"""
     gitignore_elems = [
@@ -177,7 +179,6 @@ def create_gitignore():
     except OSError as exc:
         logger.error("Failed to write .gitignore: %s", exc, exc_info=True)
         raise
-
 
 def create_vite_config(install_tailwind=False):
     """create a vite configuration"""
@@ -231,7 +232,9 @@ def fix_index_html(project_name):
     try:
         html = index_html.read_text(encoding="UTF-8")
         html = re.sub(
-            r"<title>Vite \+ React<\/title>", f"<title>{project_name}</title>", html
+            r"<title>Vite \+ React<\/title>",
+            f"<title>{project_name}</title>",
+            html,
         )
         index_html.write_text(html, encoding="UTF-8")
     except OSError as exc:
@@ -276,13 +279,16 @@ def setup_github_pages(project_name):
                 count=1,
             )
             vite_config.write_text(config_text, encoding="UTF-8")
-            logger.info("Updated vite.config.js with base property for GitHub Pages")
-        except OSError as exc:
-            logger.error("Failed to update vite.config.js: %s", exc, exc_info=True)
+
+            msg_prefix = "Updated vite.config.js with base property for "
+            message = msg_prefix + "GitHub Pages"
+            logger.info(message)
+        except Exception as exc:
+            logger.error("Failed to update vite.config.js: %s", exc)
     else:
-        logger.warning(
-            "vite.config.js not found; cannot set base property for GitHub Pages"
-        )
+        warn_prefix = "vite.config.js not found; cannot set base property for "
+        warn_msg = warn_prefix + "GitHub Pages"
+        logger.warning(warn_msg)
 
 
 def create_project(
@@ -321,7 +327,8 @@ def main(args):
     if params.deploy:
         setup_github_pages(params.project_name)
         logger.info(
-            "🚀 GitHub Pages deployment configured. To deploy, run 'npm run deploy' after committing your changes."
+            "🚀 GitHub Pages deployment configured. To deploy, run "
+            "'npm run deploy' after committing your changes."
         )
 
     return 0
