@@ -1,3 +1,7 @@
+# Cordite
+
+Cordite is a utility script for quickly bootstrapping a React project with optional Tailwind CSS, Lucide React icons, and GitHub Pages deployment configuration.
+
 # Fuse
 
 `fuse.py` is a helper script for quickly setting up a new [Vite](https://vitejs.dev/) React project.
@@ -35,3 +39,9 @@ After the script completes you can change into the new directory and start devel
 cd my-app
 npm run dev
 ```
+=======
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
