@@ -114,25 +114,6 @@ def run_command(command):
     return False
 
 
-def load_previous_ideas():
-    """Load record of previous ideas if it exists"""
-    ideas_file = Path.home() / ".fuse_ideas.json"
-    if ideas_file.exists():
-        try:
-            return json.loads(ideas_file.read_text(encoding="UTF-8"))
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse ideas file, starting fresh")
-    return []
-
-
-def save_idea(idea):
-    """Save idea to persistent storage"""
-    ideas_file = Path.home() / ".fuse_ideas.json"
-    previous_ideas = load_previous_ideas()
-    previous_ideas.append(idea)
-    ideas_file.write_text(json.dumps(previous_ideas, indent=2), encoding="UTF-8")
-
-
 def stand_up(project_name, install_tailwind=False, install_lucide=False):
     """initialize npm project"""
     npm_inited = run_command(
