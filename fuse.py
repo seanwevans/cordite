@@ -110,8 +110,7 @@ def run_command(command):
         return True
     except Exception as exc:
         logger.error(exc)
-        raise exc
-    return False
+        return False
 
 
 def load_previous_ideas():
