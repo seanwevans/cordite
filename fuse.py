@@ -9,6 +9,7 @@ import logging
 import re
 from pathlib import Path
 import subprocess
+import shlex
 import sys
 
 PROG = Path(__file__).stem
@@ -103,9 +104,13 @@ def initialize_logs(
 
 def run_command(command):
     """Run a shell command and handle errors"""
-    logger.debug("🧨 %s", command)
+    if isinstance(command, str):
+        cmd_tokens = shlex.split(command)
+    else:
+        cmd_tokens = list(command)
+    logger.debug("🧨 %s", cmd_tokens)
     try:
-        subprocess.run(command, shell=True, check=True)
+        subprocess.run(cmd_tokens, shell=False, check=True)
         return True
     except subprocess.CalledProcessError as exc:
         logger.error(
@@ -119,7 +124,15 @@ def run_command(command):
 def stand_up(project_name, install_tailwind=False, install_lucide=False):
     """initialize npm project"""
     npm_inited = run_command(
-        f'npm create vite@latest "{project_name}" -- --template react'
+        [
+            "npm",
+            "create",
+            "vite@latest",
+            project_name,
+            "--",
+            "--template",
+            "react",
+        ]
     )
     if not npm_inited:
         raise RuntimeError("Failed to initialize project")
@@ -130,19 +143,19 @@ def stand_up(project_name, install_tailwind=False, install_lucide=False):
         logger.error("Failed to change directory to %s: %s", project_name, exc, exc_info=True)
         raise
 
-    deps_installed = run_command("npm install")
+    deps_installed = run_command(["npm", "install"])
     if not deps_installed:
         raise RuntimeError("Failed to install dependencies")
 
     if install_tailwind:
-        twcss_cmd = "npm install tailwindcss @tailwindcss/vite"
-        twcss_installed = run_command(twcss_cmd)
+        twcss_installed = run_command(
+            ["npm", "install", "tailwindcss", "@tailwindcss/vite"]
+        )
         if not twcss_installed:
             raise RuntimeError("Failed to install tailwind CSS")
 
     if install_lucide:
-        lucide_cmd = "npm install lucide-react"
-        lucide_installed = run_command(lucide_cmd)
+        lucide_installed = run_command(["npm", "install", "lucide-react"])
         if not lucide_installed:
             raise RuntimeError("Failed to install Lucide-React")
 
@@ -245,7 +258,9 @@ def fix_index_html(project_name):
 def setup_github_pages(project_name):
     """Configure project for GitHub Pages deployment"""
 
-    ghpages_installed = run_command("npm install gh-pages --save-dev")
+    ghpages_installed = run_command(
+        ["npm", "install", "gh-pages", "--save-dev"]
+    )
     if not ghpages_installed:
         raise RuntimeError("Failed to install gh-pages")
 
