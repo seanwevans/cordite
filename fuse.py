@@ -71,8 +71,8 @@ def initialize_logs(
 ):
     """initializes logs"""
 
-    for handler in logger.handlers:
-        logger.removeHandler(handler)
+    # Clear existing handlers to avoid duplicate logs when reinitializing
+    logger.handlers.clear()
 
     log_format = logging.Formatter(
         "%(asctime)-23s %(module)s.%(funcName)s %(levelname)-8s %(message)s"
