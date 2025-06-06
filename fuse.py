@@ -183,7 +183,7 @@ def create_gitignore():
         "node_modules",
         "*.log",
         "dist",
-        ".vit",
+        ".vite",
         "stats.html",
         ".eslintcache",
     ]
