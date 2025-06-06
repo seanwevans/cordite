@@ -39,7 +39,6 @@ After the script completes you can change into the new directory and start devel
 cd my-app
 npm run dev
 ```
-=======
 
 ## License
 
